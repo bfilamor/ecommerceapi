@@ -447,7 +447,7 @@ module.exports.checkout = async (req, res) => {
         //create a new Order document
         let newOrder = new Order({
             customerName: `${user.firstName} ${user.lastName}`,
-            customerEmail:user.email,
+            customerEmail: user.email,
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -581,7 +581,7 @@ module.exports.prescriptionCheckout = async (req, res) => {
         //create a new Order document
         let newOrder = new Order({
             customerName: `${user.firstName} ${user.lastName}`,
-            customerEmail:user.email,
+            customerEmail: user.email,
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -755,7 +755,7 @@ module.exports.cartCheckout = async (req, res) => {
         //create a new Order document
         let newOrder = new Order({
             customerName: `${user.firstName} ${user.lastName}`,
-            customerEmail:user.email,
+            customerEmail: user.email,
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -831,6 +831,55 @@ module.exports.getUserCart = async (req, res) => {
 
     } catch (error) {
         return res.send(false)
+    }
+}
+
+module.exports.saveProduct = async (req, res) => {
+    if (req.user.isAdmin) {
+        console.log("Action forbidden.")
+        return res.send(false)
+    }
+
+    try {
+        const userSavedProducts = await User.findById(req.user.id, { savedProducts: 1 });
+        const product = await Product.findById(req.body.productId, { savedBy: 1 });
+
+        const productIndex  =  userSavedProducts.savedProducts.findIndex((userSavedProduct) => userSavedProduct === req.body.productId);
+
+        if (productIndex === -1) {
+            userSavedProducts.savedProducts.push(req.body.productId);
+            product.savedBy.push(req.user.id);
+        } else {
+            const savedByUserIndex = product.savedBy.findIndex((savedBy) => savedBy === req.user.id);
+            product.savedBy.splice(savedByUserIndex, 1);
+            userSavedProducts.savedProducts.splice(productIndex,1);
+        }
+
+        await userSavedProducts.save();
+        await product.save();
+        
+        return res.send(true);
+
+    } catch (error) {
+        console.log(error.message)
+        return res.send(false);
+    }
+}
+
+module.exports.getUserSavedProducts = async (req, res) => {
+    if (req.user.isAdmin) {
+        console.log("Action forbidden.")
+        return res.send(false)
+    }
+
+    try {
+        const userSavedProducts = await User.findById(req.user.id, { savedProducts: 1, _id:0 });
+
+        return res.send(userSavedProducts);
+
+    } catch (error) {
+        console.log(error.message)
+        return res.send(false);
     }
 }
 

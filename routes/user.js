@@ -58,4 +58,8 @@ router.post("/cartCheckout", verify, userController.cartCheckout)
 //get user cart
 router.get('/cart', verify, userController.getUserCart);
 
+router.post('/saveProduct', verify, userController.saveProduct );
+
+router.get('/getSavedProducts', verify, userController.getUserSavedProducts );
+
 module.exports = router;

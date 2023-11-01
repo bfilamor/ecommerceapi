@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const bodyParser = require('body-parser')
+const bodyParser = require('body-parser');
+require('dotenv').config()
 
 const cors = require("cors");
 
@@ -25,7 +26,7 @@ app.use(bodyParser.urlencoded({ limit: "30mb", extended: true }));
 /* local db connection url
 mongodb://localhost:27017/dbName
 */
-mongoose.connect("mongodb+srv://bryanfilamor:P5KaVMwQioJbXbqF@b320-cluster.pmdx1mt.mongodb.net/eCommerceAPI?retryWrites=true&w=majority", {
+mongoose.connect(process.env.DATABASE_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 });

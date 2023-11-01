@@ -103,6 +103,9 @@ const userSchema = new mongoose.Schema({
                     }
                 }
             ]
+    },
+    savedProducts:{
+        type:Array
     }
 })
 
