@@ -5,10 +5,16 @@ const orderSchema = new mongoose.Schema({
         type: String,
         required: [true, "User ID is required"]
     },
-    customerName:{
+    customerName: {
         type: String
     },
     customerEmail: {
+        type: String
+    },
+    customerMobileNumber: {
+        type: String
+    },
+    billingAddress: {
         type: String
     },
     products: [

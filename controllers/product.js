@@ -50,7 +50,7 @@ function sortCriteriaFunction(req) {
         }
     }
 
-    if (req.query.price === "highest") {
+    else if (req.query.price === "highest") {
         sortCriteria = {
             price: -1
         }
@@ -60,7 +60,12 @@ function sortCriteriaFunction(req) {
         }
     }
 
-    if (req.query.sortBy == "latest") {
+    else if (req.query.sortBy == "bestSelling") {
+        sortCriteria = {
+            itemsSold: -1
+        }
+    }
+    else if (req.query.sortBy == "latest") {
         sortCriteria = {
             _id: -1
         }
@@ -75,6 +80,10 @@ function sortCriteriaFunction(req) {
     } else if (req.query.sortBy == "zToA") {
         sortCriteria = {
             name: -1
+        }
+    } else {
+        sortCriteria = {
+            _id: -1
         }
     }
     //return the targeted sortCriteria into the controller function
@@ -101,17 +110,71 @@ module.exports.getAllProducts = async (req, res) => {
 //get all active products
 module.exports.getAllActive = async (req, res) => {
     try {
+        const { page } = req.query;
+        const LIMIT = 8;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page
+        const total = await Product.find({ isActive: true }).countDocuments({});
         //call the sortCriteriaFunction, then store the return values into the sortCriteria variable
         //pass req as parameter to the sortCriteriaFunction
         let sortCriteria = sortCriteriaFunction(req);
         //insert sortCrteria to sort products
-        const product = await Product.find({ isActive: true }).sort(sortCriteria);
-
-        return res.send(product);
+        if (page) {
+            const product = await Product.find({ isActive: true }).sort(sortCriteria).limit(LIMIT).skip(startIndex);
+            return res.json({ data: product, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+        } else {
+            //if we want to get all active products without divinding it in paginations
+            const product = await Product.find({ isActive: true }).sort(sortCriteria);
+            return res.send(product);
+        }
 
 
     } catch (error) {
         res.send(false)
+    }
+}
+
+//get all products for admin use
+module.exports.getAllProductsAdmin = async (req, res) => {
+    try {
+        const { page, availability, category } = req.query;
+        const LIMIT = 10;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page
+
+        let sortCriteria = sortCriteriaFunction(req);
+
+        const query = {};
+
+        if (availability == "active") {
+            query.isActive = true;
+        }
+        else if (availability == "inactive") {
+            query.isActive = false;
+        } else {
+            delete query["isActive"];
+        }
+
+        if (category == "prescription") {
+            query.category = "prescription"
+        } else if (category == "reading") {
+            query.category = "reading"
+        } else if (category == "sunglasses") {
+            query.category = "sunglasses"
+        } else {
+            delete query["category"];
+        }
+
+        const total = await Product.find(query).countDocuments({});
+        const productsFiltered = await Product.find(query).sort(sortCriteria).limit(LIMIT).skip(startIndex).then(result => {
+            if (result.length > 0) {
+                return res.json({ data: result, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+            } else {
+                return res.send(false);
+            }
+        });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.send(false);
     }
 }
 
@@ -133,8 +196,7 @@ module.exports.getAllFeaturedProducts = async (req, res) => {
 module.exports.getAllProductsByCategoryAndBrand = async (req, res) => {
     try {
         const { brand } = req.query;
-        const { productId } = req.params;
-
+        const { page } = req.query;
 
         //call the sortCriteriaFunction, then store the return values into the sortCriteria variable
         //pass req as parameter to the sortCriteriaFunction
@@ -159,19 +221,30 @@ module.exports.getAllProductsByCategoryAndBrand = async (req, res) => {
         if (req.query.searchTerm) {
             searchTerm = { $regex: req.query.searchTerm, $options: 'i' }
         } */
-
-        const productsFiltered = await Product.find({ category: req.params.category, isActive: true, brand: brandCriteria }).sort(sortCriteria);
+        const LIMIT = 8;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page
+        const total = await Product.find({ category: req.params.category, isActive: true }).countDocuments({});
 
         //checks if the category is exisitng within the products.
-        const categoryIndex = products.findIndex((product) => product.category == req.params.category);
+        /* const categoryIndex = products.findIndex((product) => product.category == req.params.category);
         //returns -1 if the category does not exist,returning an error
         if (categoryIndex === -1 || productsFiltered.length === 0) {
             console.log("No Products for this category/brand")
             return res.send(false);
+        } */
+
+        if (page) {
+            const productsFiltered = await Product.find({ category: req.params.category, isActive: true }).sort(sortCriteria).limit(LIMIT).skip(startIndex);
+            //const product = await Product.find({ isActive: true }).sort(sortCriteria).limit(LIMIT).skip(startIndex);
+            return res.json({ data: productsFiltered, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+        } else {
+            //if we want to get all active products without divinding it in paginations
+            const productsFiltered = await Product.find({ category: req.params.category, isActive: true }).sort(sortCriteria);
+            return res.send(productsFiltered);
         }
 
 
-        return res.send(productsFiltered);
+        //return res.send(productsFiltered);
 
     } catch (error) {
         console.log(error.message);
@@ -181,10 +254,16 @@ module.exports.getAllProductsByCategoryAndBrand = async (req, res) => {
 
 module.exports.searchAllProducts = async (req, res) => {
     try {
+        const { page } = req.query;
+        const LIMIT = 8;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page
+        const total = await Product.find({ name: { $regex: req.query.searchTerm, $options: 'i' }, isActive: true }).countDocuments({});
 
-        const productsFiltered = await Product.find({ name: { $regex: req.query.searchTerm, $options: 'i' }, isActive: true }).then(result => {
+        let sortCriteria = sortCriteriaFunction(req);
+
+        const productsFiltered = await Product.find({ name: { $regex: req.query.searchTerm, $options: 'i' }, isActive: true }).sort(sortCriteria).limit(LIMIT).skip(startIndex).then(result => {
             if (result.length > 0) {
-                return res.send(result)
+                return res.json({ data: result, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
             } else {
                 return res.send(false);
             }
@@ -198,15 +277,13 @@ module.exports.searchAllProducts = async (req, res) => {
 
 module.exports.searchProductinCategory = async (req, res) => {
     try {
-        const { brand } = req.query;
-        const { productId } = req.params;
-
-
+        //const { brand } = req.query;
+        const { page } = req.query;
         //call the sortCriteriaFunction, then store the return values into the sortCriteria variable
         //pass req as parameter to the sortCriteriaFunction
         let sortCriteria = sortCriteriaFunction(req);
 
-        //find all the products
+        /* //find all the products
         const products = await Product.find();
 
         //create a new array containing only the product brands
@@ -218,26 +295,78 @@ module.exports.searchProductinCategory = async (req, res) => {
         if (brand) {
             //if there is a brand query , filter the products based on the query
             brandCriteria = { $in: brand };
-        }
-
-        /* let searchTerm = {}
-
-        if (req.query.searchTerm) {
-            searchTerm = { $regex: req.query.searchTerm, $options: 'i' }
-        } */
-
-        const productsFiltered = await Product.find({ category: req.params.category, name: { $regex: req.query.searchTerm, $options: 'i' }, isActive: true, brand: brandCriteria }).sort(sortCriteria);
+        }   */
 
         //checks if the category is exisitng within the products.
-        const categoryIndex = products.findIndex((product) => product.category == req.params.category);
+        /* const categoryIndex = products.findIndex((product) => product.category == req.params.category);
         //returns -1 if the category does not exist,returning an error
         if (categoryIndex === -1 || productsFiltered.length === 0) {
             console.log("No Products for this category/brand")
             return res.send(false);
+        } */
+        const LIMIT = 8;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page
+        const total = await Product.find({ name: { $regex: req.query.searchTerm, $options: 'i' }, category: req.params.category, isActive: true }).countDocuments({});
+
+        if (page) {
+            const productsFiltered = await Product.find({ category: req.params.category, name: { $regex: req.query.searchTerm, $options: 'i' }, isActive: true }).sort(sortCriteria).limit(LIMIT).skip(startIndex);
+
+            if (productsFiltered.length > 0) {
+                return res.json({ data: productsFiltered, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+            } else {
+                return res.send(false);
+            }
+
+        } else {
+            const productsFiltered = await Product.find({ category: req.params.category, name: { $regex: req.query.searchTerm, $options: 'i' }, isActive: true }).sort(sortCriteria);
+            return res.send(productsFiltered)
         }
 
+        //return res.send(productsFiltered);
 
-        return res.send(productsFiltered);
+    } catch (error) {
+        console.log(error.message);
+        return res.send(false);
+    }
+}
+
+module.exports.searchAllProductsAdmin = async (req, res) => {
+    try {
+        const { page, availability, category } = req.query;
+        const LIMIT = 10;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page
+
+        let sortCriteria = sortCriteriaFunction(req);
+
+        const query = { name: { $regex: req.query.searchTerm, $options: 'i' } };
+
+        if (availability == "active") {
+            query.isActive = true;
+        }
+        else if (availability == "inactive") {
+            query.isActive = false;
+        } else {
+            delete query["isActive"];
+        }
+
+        if (category == "prescription") {
+            query.category = "prescription"
+        } else if (category == "reading") {
+            query.category = "reading"
+        } else if (category == "sunglasses") {
+            query.category = "sunglasses"
+        } else {
+            delete query["category"];
+        }
+
+        const total = await Product.find(query).countDocuments({});
+        const productsFiltered = await Product.find(query).sort(sortCriteria).limit(LIMIT).skip(startIndex).then(result => {
+            if (result.length > 0) {
+                return res.json({ data: result, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+            } else {
+                return res.send(false);
+            }
+        });
 
     } catch (error) {
         console.log(error.message);
@@ -311,7 +440,7 @@ module.exports.updateProduct = async (req, res) => {
 
     } catch (error) {
         return res.send(false);
-    }  
+    }
 
 }
 //archive product

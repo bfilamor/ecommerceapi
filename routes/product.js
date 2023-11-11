@@ -46,6 +46,12 @@ router.get("/category/:category/search", productController.searchProductinCatego
 
 router.get("/search/all", productController.searchAllProducts);
 
+//admin get all products w/pagination
+router.get("/admin/all", verify, verifyAdmin, productController.getAllProductsAdmin);
+
+//admin search all products
+router.get("/admin/search/all", verify, verifyAdmin, productController.searchAllProductsAdmin);
+
 //retrieve single product
 router.get("/:productId", productController.getProduct);
 

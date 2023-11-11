@@ -8,15 +8,38 @@ const auth = require("../auth");
 
 //get user orders
 module.exports.getUserOrders = async (req, res) => {
+    const { startDate, endDate, page } = req.query;
     if (!req.user || req.user.isAdmin) {
         return res.send(false)
     }
     try {
-        await Order.find({ userId: req.user.id }).then(results => {
-            return res.send(results)
-        })
+        const LIMIT = 10;
+        const startIndex = (Number(page) - 1) * LIMIT; //get the starting index of every page   
+        if (startDate && endDate) {
 
+            const total = await Order.find({
+                userId: req.user.id, purchasedOn: {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate),
+                }
+            }).countDocuments({});
+
+            const orders = await Order.find({
+                userId: req.user.id, purchasedOn: {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate),
+                }
+            }).sort({ _id: -1 }).limit(LIMIT).skip(startIndex);
+
+            return res.json({ data: orders, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+
+        } else {
+            const total = await Order.find({ userId: req.user.id }).countDocuments({});
+            const orders = await Order.find({ userId: req.user.id }).sort({ _id: -1 }).limit(LIMIT).skip(startIndex);
+            return res.json({ data: orders, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) });
+        }
     } catch (error) {
+        console.log(error.message);
         return res.send(false)
     }
 }
@@ -38,21 +61,25 @@ module.exports.getOrder = (req, res) => {
 
 module.exports.getAllOrders = async (req, res) => {
     try {
-        /*  let orderStatus = {};
-         if (req.query.status === "active") {
-             orderStatus = {
-                 status: "active"
-             }
-         } else if (req.query.status === "completed") {
-             orderStatus = {
-                 status: "completed"
-             }
-         } else if (req.query.status === "cancelled") {
-             orderStatus = {
-                 status: "cancelled"
-             }
-         } */
-        await Order.find({}).then(result => res.send(result))
+        const { startDate, endDate } = req.query;
+        if (startDate && endDate) {
+            await Order.find({
+                purchasedOn: {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate),
+                }
+            }).sort({_id:-1}).then(result => {
+                console.log(result);
+                if (result.length > 0) {
+                    return res.send(result)
+                } else {
+                    return res.send(false);
+                }
+            })
+
+        } else {
+            await Order.find({}).sort({_id:-1}).then(result => res.send(result))
+        }
     }
     catch (error) {
         console.log(error.message);

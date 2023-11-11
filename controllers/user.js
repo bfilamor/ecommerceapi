@@ -260,7 +260,7 @@ module.exports.addToCart = async (req, res) => {
 
             if (existingItem) {
                 //add the values to the existing cart item
-                existingItem.subTotal += subTotal;
+                existingItem.subTotal += subTotal - addOnSubtotal;
                 existingItem.quantity += product.quantity;
 
             } else {
@@ -271,6 +271,7 @@ module.exports.addToCart = async (req, res) => {
                         //assign the computed subtotal into the cartProduct object
                         cartProduct.subTotal = subTotal;
                         cartProduct.productName = productNameMap.get(cartProduct.productId)
+                        cartProduct.productPrice = productMap.get(cartProduct.productId)
                     }
 
                 })
@@ -299,7 +300,8 @@ module.exports.deleteCartItem = async (req, res) => {
         return res.send(false)
     }
     try {
-        const user = await User.findById(req.user.id, { cart: 1 })
+        const user = await User.findById(req.user.id, { cart: 1 });
+
         if (user.cart.cartProducts.length > 0) {
             //find the index of the selected item from user's cart 
             const productIndex = user.cart.cartProducts.findIndex((cartProduct) => cartProduct.productId == req.body.productId);
@@ -309,6 +311,7 @@ module.exports.deleteCartItem = async (req, res) => {
                 return res.send(false)
             }
             const itemSelected = user.cart.cartProducts[productIndex];
+            const itemSelectedOriginalPrice = await Product.findById(itemSelected.productId, { price: 1 });
 
             //if the product is not empty, create a filtered array where the productId sent by user is filtered out
             const newCart = user.cart.cartProducts.filter(product => {
@@ -317,9 +320,8 @@ module.exports.deleteCartItem = async (req, res) => {
 
             /* //using the find method, return the deleted object of the array
             const itemSelected = user.cart.cartProducts.find(cartItem => cartItem.productId === req.body.productId); */
+            if (req.body.quantity >= itemSelected.quantity || !req.body.quantity) {
 
-
-            if (req.body.quantity === itemSelected.quantity || !req.body.quantity) {
                 //if the user inputted quantity is  equal to the quantity of the product in the cart or no quantity is given, remove the item from the cart
                 //replace current cart array with the new one
                 //splice from index 0 up to the last index (which is the cartarray length) 
@@ -330,22 +332,30 @@ module.exports.deleteCartItem = async (req, res) => {
             } else if (req.body.quantity < itemSelected.quantity) {
                 //if the user inputted quantity is less than than the current quantity, update the product values in the cart.
                 //for example, if the current subtotal of 3 products is 30,000, and user wanted to reduce the quantity into 2, to get the new subtotal, we would need to get the original price first by dividing the currentsubtotal by the current quantity (30,000/3 = 10,000), then we would multiply it by the new quantity (10,000 * 2 = 20,000)
+                let addOnSubtotal = 0;
+                itemSelected.addOns.forEach((addOn) => {
+                    addOnSubtotal += addOn.price
+                })
 
                 let totalAmount = 0;
                 user.cart.cartProducts.forEach((product) => {
                     if (product.productId === itemSelected.productId) {
-                        product.subTotal = (itemSelected.subTotal / itemSelected.quantity) * (itemSelected.quantity - req.body.quantity);
+                        //product.subTotal = (itemSelected.subTotal / itemSelected.quantity) * (itemSelected.quantity - req.body.quantity);
 
-                        /*  itemSelected.addOns.forEach((addOn) => {
-                             itemSelected.subTotal = ((itemSelected.subTotal / itemSelected.quantity) * (itemSelected.quantity - req.body.quantity)) - addOn.price;
-                         }) */
+                        product.subTotal = (itemSelectedOriginalPrice.price * (itemSelected.quantity - req.body.quantity)) + addOnSubtotal
 
-                        product.quantity = product.quantity - req.body.quantity;
+                            /*  itemSelected.addOns.forEach((addOn) => {
+                                 itemSelected.subTotal = ((itemSelected.subTotal / itemSelected.quantity) * (itemSelected.quantity - req.body.quantity)) - addOn.price;
+                             }) */
+
+                            product.quantity = product.quantity - req.body.quantity;
 
                     }
 
                     totalAmount = totalAmount + product.subTotal
                 })
+
+
 
                 user.cart.totalAmount = totalAmount;
 
@@ -436,18 +446,21 @@ module.exports.checkout = async (req, res) => {
         for (let i = 0; i < product.length; i++) {
             //for every product iteration, substract the quantity from user input into the stocks property of the product
             product[i].stocks = product[i].stocks - userProductsInputArray[i].quantity;
+            product[i].itemsSold = product[i].itemsSold + userProductsInputArray[i].quantity;
             if (product[i].stocks < 0) {
                 console.log(`insufficient stocks for ${product[i].name}`)
                 return res.send(false)
             }
             //update stocks after  user checkout
-            await Product.updateMany({ _id: product[i]._id, stocks: { $gt: 0 } }, { $set: { stocks: product[i].stocks } })
+            await Product.updateMany({ _id: product[i]._id, stocks: { $gt: 0 } }, { $set: { stocks: product[i].stocks, itemsSold: product[i].itemsSold } })
         }
 
         //create a new Order document
         let newOrder = new Order({
-            customerName: `${user.firstName} ${user.lastName}`,
-            customerEmail: user.email,
+            customerName: req.body.customerName,
+            customerEmail: req.body.customerEmail,
+            customerMobileNumber: req.body.customerMobileNumber,
+            billingAddress: req.body.billingAddress, 
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -570,18 +583,21 @@ module.exports.prescriptionCheckout = async (req, res) => {
         for (let i = 0; i < product.length; i++) {
             //for every product iteration, substract the quantity from user input into the stocks property of the product
             product[i].stocks = product[i].stocks - userProductsInputArray[i].quantity;
+            product[i].itemsSold = product[i].itemsSold + userProductsInputArray[i].quantity;
             if (product[i].stocks < 0) {
                 console.log(`insufficient stocks for ${product[i].name}`)
                 return res.send(false)
             }
             //update stocks after  user checkout
-            await Product.updateMany({ _id: product[i]._id, stocks: { $gt: 0 } }, { $set: { stocks: product[i].stocks } })
+            await Product.updateMany({ _id: product[i]._id, stocks: { $gt: 0 } }, { $set: { stocks: product[i].stocks, itemsSold: product[i].itemsSold } })
         }
 
         //create a new Order document
         let newOrder = new Order({
-            customerName: `${user.firstName} ${user.lastName}`,
-            customerEmail: user.email,
+            customerName: req.body.customerName,
+            customerEmail: req.body.customerEmail,
+            customerMobileNumber: req.body.customerMobileNumber,
+            billingAddress: req.body.billingAddress, 
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -715,6 +731,7 @@ module.exports.cartCheckout = async (req, res) => {
         const user = await User.findById(req.user.id);
 
         let userProductsInputArray = user.cart.cartProducts;
+        let userCart = user.cart;
 
         //create an array of product ids from the user input
         let userCartProductsID = userProductsInputArray.map((product) => {
@@ -744,21 +761,25 @@ module.exports.cartCheckout = async (req, res) => {
         for (let i = 0; i < product.length; i++) {
             //for every product iteration, substract the quantity from user input into the stocks property of the product
             product[i].stocks = product[i].stocks - userProductsInputArray[i].quantity;
+            product[i].itemsSold = product[i].itemsSold + userProductsInputArray[i].quantity;
             if (product[i].stocks < 0) {
                 console.log(`insufficient stocks for ${product[i].name}`)
                 return res.send(false)
             }
             //update stocks after  user checkout
-            await Product.updateMany({ _id: product[i]._id, stocks: { $gt: 0 } }, { $set: { stocks: product[i].stocks } })
+            await Product.updateMany({ _id: product[i]._id, stocks: { $gt: 0 } }, { $set: { stocks: product[i].stocks, itemsSold: product[i].itemsSold } })
         }
 
         //create a new Order document
         let newOrder = new Order({
-            customerName: `${user.firstName} ${user.lastName}`,
-            customerEmail: user.email,
+            customerName: req.body.customerName,
+            customerEmail: req.body.customerEmail,
+            customerMobileNumber: req.body.customerMobileNumber,
+            billingAddress: req.body.billingAddress, 
             userId: req.user.id,
-            totalAmount: totalAmount
+            totalAmount: userCart.totalAmount
         })
+
 
         // create a new array of objects for every user input products
         let productsArray = userProductsInputArray.map((product) => {
@@ -768,12 +789,12 @@ module.exports.cartCheckout = async (req, res) => {
                 productId: product.productId,
                 quantity: product.quantity,
                 addOns: product.addOns,
-                subTotal: productMap.get(product.productId) * product.quantity
+                subTotal: product.subTotal
             }
         })
 
         // loop through each products that the user ordered via req body
-        userProductsInputArray.forEach((product) => {
+        /* userProductsInputArray.forEach((product) => {
             totalAmount += productMap.get(product.productId) * product.quantity;
 
             if (product.addOns.length > 0) {
@@ -783,22 +804,22 @@ module.exports.cartCheckout = async (req, res) => {
                 })
 
             }
-        });
+        }); */
 
         //const order = await newOrder.save();
 
-        newOrder.totalAmount = totalAmount;
+        //newOrder.totalAmount = totalAmount;
 
         //insert the objects into the Order models products property array
         newOrder.products.push(...productsArray);
 
-        newOrder.products.forEach((order) => {
-            if (order.addOns.length > 0) {
-                order.addOns.forEach((addOn) => {
-                    order.subTotal += addOn.price
-                })
-            }
-        })
+        /*   newOrder.products.forEach((order) => {
+              if (order.addOns.length > 0) {
+                  order.addOns.forEach((addOn) => {
+                      order.subTotal += addOn.price
+                  })
+              }
+          }) */
 
         await newOrder.save().then(() => {
             //if the user has an existing cart
@@ -844,7 +865,7 @@ module.exports.saveProduct = async (req, res) => {
         const userSavedProducts = await User.findById(req.user.id, { savedProducts: 1 });
         const product = await Product.findById(req.body.productId, { savedBy: 1 });
 
-        const productIndex  =  userSavedProducts.savedProducts.findIndex((userSavedProduct) => userSavedProduct === req.body.productId);
+        const productIndex = userSavedProducts.savedProducts.findIndex((userSavedProduct) => userSavedProduct === req.body.productId);
 
         if (productIndex === -1) {
             userSavedProducts.savedProducts.push(req.body.productId);
@@ -852,12 +873,12 @@ module.exports.saveProduct = async (req, res) => {
         } else {
             const savedByUserIndex = product.savedBy.findIndex((savedBy) => savedBy === req.user.id);
             product.savedBy.splice(savedByUserIndex, 1);
-            userSavedProducts.savedProducts.splice(productIndex,1);
+            userSavedProducts.savedProducts.splice(productIndex, 1);
         }
 
         await userSavedProducts.save();
         await product.save();
-        
+
         return res.send(true);
 
     } catch (error) {
@@ -873,7 +894,7 @@ module.exports.getUserSavedProducts = async (req, res) => {
     }
 
     try {
-        const userSavedProducts = await User.findById(req.user.id, { savedProducts: 1, _id:0 });
+        const userSavedProducts = await User.findById(req.user.id, { savedProducts: 1, _id: 0 });
 
         return res.send(userSavedProducts);
 
