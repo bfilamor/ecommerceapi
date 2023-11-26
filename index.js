@@ -10,6 +10,8 @@ const userRoutes = require("./routes/user");
 const productRoutes = require("./routes/product");
 const orderRoutes =  require("./routes/order")
 const productAddOnRoutes = require("./routes/productAddOn");
+const doctorRoutes = require("./routes/doctor");
+const appointmentRoutes = require("./routes/appointment");
 
 //Servers setup
 const app = express();
@@ -41,6 +43,8 @@ app.use("/users", userRoutes);
 app.use("/products", productRoutes);
 app.use("/addons", productAddOnRoutes);
 app.use("/orders", orderRoutes);
+app.use("/doctors", doctorRoutes);
+app.use("/appointments", appointmentRoutes);
 /* app.use("/b6/users", userRoutes);
 app.use("/b6/products", productRoutes);
 app.use("/b6/addons", productAddOnRoutes);

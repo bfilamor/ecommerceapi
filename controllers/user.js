@@ -344,11 +344,11 @@ module.exports.deleteCartItem = async (req, res) => {
 
                         product.subTotal = (itemSelectedOriginalPrice.price * (itemSelected.quantity - req.body.quantity)) + addOnSubtotal
 
-                            /*  itemSelected.addOns.forEach((addOn) => {
-                                 itemSelected.subTotal = ((itemSelected.subTotal / itemSelected.quantity) * (itemSelected.quantity - req.body.quantity)) - addOn.price;
-                             }) */
+                        /*  itemSelected.addOns.forEach((addOn) => {
+                             itemSelected.subTotal = ((itemSelected.subTotal / itemSelected.quantity) * (itemSelected.quantity - req.body.quantity)) - addOn.price;
+                         }) */
 
-                            product.quantity = product.quantity - req.body.quantity;
+                        product.quantity = product.quantity - req.body.quantity;
 
                     }
 
@@ -460,7 +460,7 @@ module.exports.checkout = async (req, res) => {
             customerName: req.body.customerName,
             customerEmail: req.body.customerEmail,
             customerMobileNumber: req.body.customerMobileNumber,
-            billingAddress: req.body.billingAddress, 
+            billingAddress: req.body.billingAddress,
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -597,7 +597,7 @@ module.exports.prescriptionCheckout = async (req, res) => {
             customerName: req.body.customerName,
             customerEmail: req.body.customerEmail,
             customerMobileNumber: req.body.customerMobileNumber,
-            billingAddress: req.body.billingAddress, 
+            billingAddress: req.body.billingAddress,
             userId: req.user.id,
             totalAmount: totalAmount
         })
@@ -775,7 +775,7 @@ module.exports.cartCheckout = async (req, res) => {
             customerName: req.body.customerName,
             customerEmail: req.body.customerEmail,
             customerMobileNumber: req.body.customerMobileNumber,
-            billingAddress: req.body.billingAddress, 
+            billingAddress: req.body.billingAddress,
             userId: req.user.id,
             totalAmount: userCart.totalAmount
         })
@@ -846,7 +846,7 @@ module.exports.getUserCart = async (req, res) => {
         if (user.cart.cartProducts.length > 0) {
             return res.send(user);
         } else {
-            console.log("User Cart is Empty.")
+            //console.log("User Cart is Empty.")
             return res.send(false)
         }
 
@@ -902,6 +902,59 @@ module.exports.getUserSavedProducts = async (req, res) => {
         console.log(error.message)
         return res.send(false);
     }
+}
+
+module.exports.getAllNotifications = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id, { notifications: 1 });
+
+        return res.send(user.notifications);
+
+    } catch (error) {
+        console.log(error.message);
+        return res.send(false);
+    }
+}
+
+module.exports.readNotfication = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id, { notifications: 1 });
+
+        const notification = user.notifications.find((notification) => notification._id.toString() === req.body.notificationId);
+        if (notification) {
+            notification.isRead = true;
+            await user.save().then(() => {
+                return res.send(true);
+            })
+        } else {
+            return res.send(false);
+        }
+
+    } catch (error) {
+        console.log(error.message);
+        return res.send(false);
+    }
+}
+
+module.exports.markAllNotifcationsAsOld = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id, { notifications: 1 });
+
+        user.notifications.forEach((notification) => {
+            if (notification.isOld === false) {
+                notification.isOld = true;
+            }
+        })
+
+        await user.save().then(() => {
+            return res.send(true);
+        })
+
+    } catch (error) {
+        console.log(error.message);
+        return res.send(false);
+    }
+
 }
 
 

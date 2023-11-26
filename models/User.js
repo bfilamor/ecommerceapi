@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
                         type: String
                     },
                     productPrice: {
-                        type:Number
+                        type: Number
                     },
                     productName: {
                         type: String
@@ -107,9 +107,43 @@ const userSchema = new mongoose.Schema({
                 }
             ]
     },
-    savedProducts:{
-        type:Array
-    }
+    savedProducts: {
+        type: Array
+    },
+    notifications: [
+        {
+            appointmentId: {
+                type: String
+            },
+            appointmentDate: {
+                type: Date
+            },
+            status: {
+                type: String
+            },
+            doctorName: {
+                type: String
+            },
+            timeSlot: {
+                type: String
+            },
+            status: {
+                type: String
+            },
+            isOld: {
+                type: Boolean,
+                default: false
+            },
+            isRead: {
+                type: Boolean,
+                default: false
+            },
+            date: {
+                type: Date,
+                default: new Date()
+            }
+        }
+    ]
 })
 
 module.exports = mongoose.model("User", userSchema);

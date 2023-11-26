@@ -62,4 +62,10 @@ router.post('/saveProduct', verify, userController.saveProduct );
 
 router.get('/getSavedProducts', verify, userController.getUserSavedProducts );
 
+router.get('/notifications', verify, userController.getAllNotifications);
+
+router.put('/notifications/read', verify, userController.readNotfication);
+
+router.put('/notifications/markAllAsOld', verify, userController.markAllNotifcationsAsOld);
+
 module.exports = router;
